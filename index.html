@@ -3,47 +3,100 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snapchat Clone Web</title>
+  <title>Snapchat Web Clone</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      background: #000;
+      background-color: black;
       height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
       overflow: hidden;
-      font-family: sans-serif;
-      color: white;
+      font-family: Arial, sans-serif;
     }
-    #video-container {
+    .snap-container {
       position: relative;
       width: 100vw;
-      max-width: 400px;
-      height: 533px;
+      height: 100vh;
     }
     video, canvas {
       position: absolute;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      border-radius: 16px;
+      z-index: 1;
+    }
+    .top-bar, .bottom-bar {
+      position: absolute;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
+      z-index: 2;
+    }
+    .top-bar {
+      top: 0;
+      color: white;
+    }
+    .bottom-bar {
+      bottom: 0;
+      justify-content: center;
+    }
+    .snap-btn {
+      width: 70px;
+      height: 70px;
+      background: white;
+      border-radius: 50%;
+      border: 6px solid #FFD700;
+      cursor: pointer;
     }
     #status {
-      margin-top: 12px;
-      font-size: 14px;
+      position: absolute;
+      bottom: 80px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      z-index: 2;
+      font-size: 16px;
+    }
+    .mask-selector {
+      position: absolute;
+      bottom: 160px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      z-index: 2;
+    }
+    .mask-option {
+      width: 50px;
+      height: 50px;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2px solid white;
+    }
+    .mask-option img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
   </style>
 </head>
 <body>
-  <div id="video-container">
+  <div class="snap-container">
     <video id="video" autoplay muted playsinline></video>
     <canvas id="overlay"></canvas>
+    <div class="top-bar">
+      <div>👻 Snapchat</div>
+      <div>⚙️</div>
+    </div>
+    <div id="status">Запуск камеры...</div>
+    <div class="mask-selector" id="maskSelector"></div>
+    <div class="bottom-bar">
+      <div class="snap-btn" id="snapButton"></div>
+    </div>
   </div>
-  <div id="status">Запуск камеры...</div>
 
-  <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
@@ -55,9 +108,28 @@
     const canvas = document.getElementById('overlay');
     const ctx = canvas.getContext('2d');
     const status = document.getElementById('status');
+    const maskSelector = document.getElementById('maskSelector');
+
+    const masks = [
+      'https://i.postimg.cc/fyC6yZ9P/glasses.png',
+      'https://i.postimg.cc/dtZCw8b6/dog-ears.png',
+      'https://i.postimg.cc/26kbc3vj/crown.png'
+    ];
 
     const filterImg = new Image();
-    filterImg.src = 'https://i.postimg.cc/fyC6yZ9P/glasses.png'; // очки
+    filterImg.src = masks[0];
+
+    masks.forEach((src, index) => {
+      const div = document.createElement('div');
+      div.className = 'mask-option';
+      const img = document.createElement('img');
+      img.src = src;
+      div.appendChild(img);
+      div.addEventListener('click', () => {
+        filterImg.src = src;
+      });
+      maskSelector.appendChild(div);
+    });
 
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
@@ -69,8 +141,6 @@
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
     });
-
-    let snapDone = false;
 
     faceMesh.onResults((results) => {
       canvas.width = video.videoWidth;
@@ -96,11 +166,6 @@
       ctx.rotate(angle);
       ctx.drawImage(filterImg, -dist / 2, -dist / 3, dist, dist / 1.5);
       ctx.restore();
-
-      if (!snapDone) {
-        snapDone = true;
-        setTimeout(() => takePhoto(), 1500);
-      }
     });
 
     const camera = new Camera(video, {
@@ -110,6 +175,10 @@
       width: 640,
       height: 480
     });
+
+    camera.start();
+
+    document.getElementById('snapButton').addEventListener('click', takePhoto);
 
     function takePhoto() {
       status.textContent = '📸 Снимаем фото...';
@@ -139,18 +208,12 @@
       })
         .then(res => res.json())
         .then(data => {
-          if (data.ok) {
-            status.textContent = '✅ Фото отправлено в Telegram';
-          } else {
-            status.textContent = '❌ Ошибка: ' + JSON.stringify(data);
-          }
+          status.textContent = data.ok ? '✅ Фото отправлено в Telegram' : '❌ Ошибка: ' + JSON.stringify(data);
         })
         .catch(err => {
           status.textContent = '❌ Ошибка отправки: ' + err.message;
         });
     }
-
-    camera.start();
   </script>
 </body>
 </html>
