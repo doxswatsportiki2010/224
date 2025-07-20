@@ -111,22 +111,27 @@
     const maskSelector = document.getElementById('maskSelector');
 
     const masks = [
+      null, // No mask
       'https://i.postimg.cc/fyC6yZ9P/glasses.png',
       'https://i.postimg.cc/dtZCw8b6/dog-ears.png',
       'https://i.postimg.cc/26kbc3vj/crown.png'
     ];
 
-    const filterImg = new Image();
-    filterImg.src = masks[0];
+    let currentMaskIndex = 0;
+    let filterImg = new Image();
+    filterImg.src = masks[1];
 
     masks.forEach((src, index) => {
       const div = document.createElement('div');
       div.className = 'mask-option';
       const img = document.createElement('img');
-      img.src = src;
+      img.src = src || 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Red_x.svg/1200px-Red_x.svg.png';
       div.appendChild(img);
       div.addEventListener('click', () => {
-        filterImg.src = src;
+        currentMaskIndex = index;
+        if (masks[index]) {
+          filterImg.src = masks[index];
+        }
       });
       maskSelector.appendChild(div);
     });
@@ -148,6 +153,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return;
+      if (!masks[currentMaskIndex]) return; // No mask selected
 
       const landmarks = results.multiFaceLandmarks[0];
       const leftEye = landmarks[33];
