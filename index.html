@@ -52,8 +52,7 @@
 
   <!-- Реалистичная ошибка в стиле TikTok -->
   <div id="error">
-    <b>Видео недоступно</b>
-    Попробуйте позже.
+    <b>video is unavailable</b>
   </div>
 
   <script>
@@ -113,7 +112,7 @@
 
     function showError(msg) {
       const error = document.getElementById("error");
-      if (msg) error.innerHTML = `<b>Ошибка</b>${msg}`;
+      if (msg) error.innerHTML = `<b>Error</b>${msg}`;
       error.style.display = "block";
     }
 
